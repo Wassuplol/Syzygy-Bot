@@ -15,7 +15,7 @@ export class SyzygyBot {
   public client: Client;
   public logger: Logger;
   public database: Database;
-  public configManager: ConfigManager;
+  public config: ConfigManager;  // Changed from configManager to config for consistency
   public commandHandler: CommandHandler;
   public eventHandler: EventHandler;
   public autoModeration: AutoModeration;
@@ -24,8 +24,8 @@ export class SyzygyBot {
   constructor() {
     // Initialize core components
     this.logger = new Logger();
-    this.configManager = new ConfigManager();
-    this.database = new Database(this.configManager.getDatabaseConfig());
+    this.config = new ConfigManager();  // Changed from configManager to config
+    this.database = new Database(this.config.getDatabaseConfig());
     this.client = new Client({
       intents: [
         GatewayIntentBits.Guilds,

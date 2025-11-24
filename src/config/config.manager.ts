@@ -31,6 +31,16 @@ export interface BotConfig {
     ticketSystem: boolean;
     logging: boolean;
   };
+  ai: {
+    nanogptApiKey: string;
+    aiImageModerationEnabled: boolean;
+    aiModelId: string;
+    aiMaxConcurrency: number;
+    aiRequestTimeout: number;
+    aiCacheTtl: number;
+    aiFailsafeEnabled: boolean;
+    aiMinConfidenceThreshold: number;
+  };
 }
 
 export class ConfigManager {
@@ -64,6 +74,14 @@ export class ConfigManager {
       RATE_LIMIT_WINDOW_MS: Joi.number().integer().min(1000).max(60000).default(60000),
       ANTI_NUKE_ENABLED: Joi.boolean().default(true),
       ANTI_NUKE_THRESHOLD: Joi.number().integer().min(5).max(100).default(10),
+      NANOGPT_API_KEY: Joi.string().optional(),
+      AI_IMAGE_MODERATION_ENABLED: Joi.boolean().default(false),
+      AI_MODEL_ID: Joi.string().default('Qwen/Qwen3-VL-235B-A22B-Instruct'),
+      AI_MAX_CONCURRENCY: Joi.number().integer().min(1).max(10).default(5),
+      AI_REQUEST_TIMEOUT: Joi.number().integer().min(1000).max(30000).default(8000),
+      AI_CACHE_TTL: Joi.number().integer().min(60).max(3600).default(300),
+      AI_FAILSAFE_ENABLED: Joi.boolean().default(true),
+      AI_MIN_CONFIDENCE_THRESHOLD: Joi.number().min(0.1).max(1.0).default(0.85),
     });
 
     const { error, value: env } = envSchema.validate(process.env, { allowUnknown: true });
@@ -112,6 +130,16 @@ export class ConfigManager {
         reactionRoles: true,
         ticketSystem: true,
         logging: true,
+      },
+      ai: {
+        nanogptApiKey: env.NANOGPT_API_KEY || '',
+        aiImageModerationEnabled: env.AI_IMAGE_MODERATION_ENABLED,
+        aiModelId: env.AI_MODEL_ID,
+        aiMaxConcurrency: env.AI_MAX_CONCURRENCY,
+        aiRequestTimeout: env.AI_REQUEST_TIMEOUT,
+        aiCacheTtl: env.AI_CACHE_TTL,
+        aiFailsafeEnabled: env.AI_FAILSAFE_ENABLED,
+        aiMinConfidenceThreshold: env.AI_MIN_CONFIDENCE_THRESHOLD,
       }
     };
   }
@@ -150,6 +178,16 @@ export class ConfigManager {
         reactionRoles: Joi.boolean().required(),
         ticketSystem: Joi.boolean().required(),
         logging: Joi.boolean().required(),
+      }).required(),
+      ai: Joi.object({
+        nanogptApiKey: Joi.string().optional(),
+        aiImageModerationEnabled: Joi.boolean().required(),
+        aiModelId: Joi.string().required(),
+        aiMaxConcurrency: Joi.number().integer().min(1).max(10).required(),
+        aiRequestTimeout: Joi.number().integer().min(1000).max(30000).required(),
+        aiCacheTtl: Joi.number().integer().min(60).max(3600).required(),
+        aiFailsafeEnabled: Joi.boolean().required(),
+        aiMinConfidenceThreshold: Joi.number().min(0.1).max(1.0).required(),
       }).required(),
     });
 
@@ -224,5 +262,41 @@ export class ConfigManager {
 
     const { error } = guildConfigSchema.validate(guildConfig);
     return !error;
+  }
+
+  public getAiConfig(): BotConfig['ai'] {
+    return this.config.ai;
+  }
+
+  public getNanogptApiKey(): string {
+    return this.config.ai.nanogptApiKey;
+  }
+
+  public isAiImageModerationEnabled(): boolean {
+    return this.config.ai.aiImageModerationEnabled;
+  }
+
+  public getAiModelId(): string {
+    return this.config.ai.aiModelId;
+  }
+
+  public getAiMaxConcurrency(): number {
+    return this.config.ai.aiMaxConcurrency;
+  }
+
+  public getAiRequestTimeout(): number {
+    return this.config.ai.aiRequestTimeout;
+  }
+
+  public getAiCacheTtl(): number {
+    return this.config.ai.aiCacheTtl;
+  }
+
+  public isAiFailsafeEnabled(): boolean {
+    return this.config.ai.aiFailsafeEnabled;
+  }
+
+  public getAiMinConfidenceThreshold(): number {
+    return this.config.ai.aiMinConfidenceThreshold;
   }
 }

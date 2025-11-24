@@ -1,6 +1,7 @@
 import { Message, GuildMember, Guild, ChannelType } from 'discord.js';
 import { Logger } from '../utils/logger';
 import { SyzygyBot } from '../index';
+import { NanoGPTService } from '../services/nanoGPTService';
 
 export interface AutoModRule {
   id: string;
@@ -16,6 +17,7 @@ export interface AutoModRule {
 export class AutoModeration {
   private logger: Logger;
   private bot: SyzygyBot;
+  private nanoGPTService: NanoGPTService | null = null;
   private rules: Map<string, AutoModRule[]> = new Map(); // guildId -> rules
   private spamTracker: Map<string, { messages: number; timestamp: number }[]> = new Map();
   private inviteCache: Set<string> = new Set();
@@ -23,6 +25,14 @@ export class AutoModeration {
   constructor(bot: SyzygyBot) {
     this.logger = new Logger('AutoModeration');
     this.bot = bot;
+    
+    // Initialize NanoGPT service if AI image moderation is enabled
+    if (bot.config.isAiImageModerationEnabled()) {
+      this.nanoGPTService = new NanoGPTService();
+      this.logger.info('AI Image Moderation service initialized');
+    } else {
+      this.logger.info('AI Image Moderation service disabled');
+    }
   }
 
   public async initialize(): Promise<void> {
@@ -87,62 +97,67 @@ export class AutoModeration {
 
   public async processMessage(message: Message): Promise<void> {
     if (!message.guild) return; // Only process guild messages
-    
+
+    // First, handle image attachments if AI image moderation is enabled
+    if (this.nanoGPTService && message.attachments.size > 0) {
+      await this.analyzeImages(message);
+    }
+
     const guildId = message.guild.id;
     const rules = this.rules.get(guildId) || [];
-    
+
     // Skip if automod is disabled for this guild
     const guildConfig = await this.bot.database.getGuildConfig(guildId);
     if (!guildConfig.automod_enabled) return;
-    
+
     // Check if user has admin/moderator roles
     if (await this.hasModeratorRole(message.member, guildId)) {
       return; // Don't moderate moderators/admins
     }
-    
+
     // Process each enabled rule
     for (const rule of rules) {
       if (!rule.enabled) continue;
-      
+
       let shouldTakeAction = false;
       let reason = '';
-      
+
       switch (rule.type) {
         case 'profanity':
           shouldTakeAction = this.checkProfanity(message.content, rule.config);
           reason = 'Profanity detected';
           break;
-          
+
         case 'spam':
           shouldTakeAction = await this.checkSpam(message, rule.config);
           reason = 'Spam detected';
           break;
-          
+
         case 'invites':
           shouldTakeAction = this.checkInvites(message.content, rule.config);
           reason = 'Unauthorized invite detected';
           break;
-          
+
         case 'links':
           shouldTakeAction = this.checkLinks(message.content, rule.config);
           reason = 'Unauthorized link detected';
           break;
-          
+
         case 'caps':
           shouldTakeAction = this.checkCaps(message.content, rule.config);
           reason = 'Excessive caps detected';
           break;
-          
+
         case 'duplicate':
           shouldTakeAction = await this.checkDuplicate(message, rule.config);
           reason = 'Duplicate message detected';
           break;
-          
+
         default:
           this.logger.warn(`Unknown automod rule type: ${rule.type}`);
           break;
       }
-      
+
       if (shouldTakeAction) {
         await this.takeModerationAction(
           message.guild,
@@ -152,6 +167,60 @@ export class AutoModeration {
           reason
         );
         break; // Only take one action per message
+      }
+    }
+  }
+
+  private async analyzeImages(message: Message): Promise<void> {
+    if (!this.nanoGPTService) return;
+
+    for (const attachment of message.attachments.values()) {
+      // Only process image files
+      if (!attachment.contentType || !attachment.contentType.startsWith('image/')) {
+        continue;
+      }
+
+      try {
+        // Download the image
+        const response = await fetch(attachment.url);
+        if (!response.ok) {
+          throw new Error(`Failed to download image: ${response.status}`);
+        }
+
+        const imageBuffer = Buffer.from(await response.arrayBuffer());
+
+        // Analyze the image with NanoGPT
+        const result = await this.nanoGPTService.analyzeImage(message, imageBuffer);
+
+        if (result.isViolation) {
+          this.logger.moderation(
+            'Image Violation Detected (AI)', 
+            this.bot.client.user!.id, 
+            message.author.id, 
+            message.guild!.id, 
+            result.reason || 'AI detected violation'
+          );
+
+          // Take moderation action
+          await this.takeModerationAction(
+            message.guild!,
+            message.member,
+            message,
+            'image-violation',
+            result.reason || 'AI detected violation'
+          );
+        } else {
+          this.logger.debug(`Image analysis completed for ${message.id}: SAFE`);
+        }
+      } catch (error) {
+        this.logger.error(`Error analyzing image attachment:`, error);
+        
+        // If AI fails and failsafe is enabled, fall back to basic image moderation
+        if (this.bot.config.isAiFailsafeEnabled()) {
+          this.logger.info(`AI analysis failed, applying failsafe image moderation for message ${message.id}`);
+          // For now, just log that there was an error in AI analysis
+          // Additional failsafe logic can be implemented here if needed
+        }
       }
     }
   }

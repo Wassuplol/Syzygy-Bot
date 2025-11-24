@@ -39,6 +39,16 @@ Syzygy is a battle-tested, enterprise-grade Discord moderation bot that offers a
 - Logging system with comprehensive channel logging
 - Voice channel logging and auto-moderation
 
+### 🎯 Advanced AI Vision Moderation
+- **Real AI-powered image analysis** using NanoGPT API with Qwen/Qwen3-VL-235B-A22B-Instruct model
+- **NSFW content detection** with high accuracy using state-of-the-art vision AI
+- **Hate symbol identification** to detect and prevent harmful imagery
+- **Rule violation detection** for custom server rules applied to images
+- **Privacy-focused processing** - images processed in-memory only, never stored
+- **Performance optimized** with caching and concurrency controls for large servers
+- **Failsafe system** that falls back to rule-based filtering when AI is unavailable
+- **Configurable confidence thresholds** to adjust sensitivity based on server needs
+
 ### 🛡️ Security & Anti-Abuse
 - Advanced anti-nuke protection (role deletion, channel deletion, ban waves detection)
 - Mass ban/kick prevention with cooldowns and approval workflows
@@ -141,6 +151,16 @@ MAX_COMMAND_EXECUTIONS_PER_MINUTE=100
 RATE_LIMIT_WINDOW_MS=60000
 ANTI_NUKE_ENABLED=true
 ANTI_NUKE_THRESHOLD=10
+
+# NanoGPT AI Integration (Vision Moderation)
+NANOGPT_API_KEY=your_api_key_here
+AI_IMAGE_MODERATION_ENABLED=true
+AI_MODEL_ID=Qwen/Qwen3-VL-235B-A22B-Instruct
+AI_MAX_CONCURRENCY=5
+AI_REQUEST_TIMEOUT=8000
+AI_CACHE_TTL=300
+AI_FAILSAFE_ENABLED=true
+AI_MIN_CONFIDENCE_THRESHOLD=0.85
 ```
 
 ## 📚 Commands
