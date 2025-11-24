@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  syzygy-bot:
+    build: .
+    container_name: syzygy-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - DATABASE_TYPE=sqlite
+      - SQLITE_PATH=/data/syzygy.db
+      - MAX_MEMORY_USAGE=512
+      - CPU_THRESHOLD=70
+      - MAX_RESPONSE_TIME=1000
+      - DATA_RETENTION_DAYS=90
+      - ANTI_NUKE_ENABLED=true
+      - ANTI_NUKE_THRESHOLD=10
+    volumes:
+      - syzygy-data:/data
+      - ./logs:/app/logs
+    networks:
+      - syzygy-network
+    depends_on:
+      - redis
+      - postgres
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('fs').accessSync('/tmp/healthcheck')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: syzygy-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - syzygy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: syzygy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: syzygy
+      POSTGRES_USER: syzygy_user
+      POSTGRES_PASSWORD: syzygy_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - syzygy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syzygy_user -d syzygy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  syzygy-data:
+  redis-data:
+  postgres-data:
+
+networks:
+  syzygy-network:
+    driver: bridge
